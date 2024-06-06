@@ -104,6 +104,8 @@ def run():
 
     all_logs = lr_logs + dt_logs + dt_strings
     print("\n".join(all_logs))
+    for df in feature_dfs:
+        df.show()
 
     if not test_run:
         rdd = sc.parallelize(lr_logs + dt_logs, numSlices=1)
@@ -113,8 +115,6 @@ def run():
         for i, df in enumerate(feature_dfs):
             df_output_path = f"{output_path}/feature_df_{i}"
             df.coalesce(1).write.mode("overwrite").csv(df_output_path, header=True)
-
-    print("\n\nDone!\n\n")
 
 
 ############################################################
@@ -205,7 +205,6 @@ def create_dt_and_feature_df(spark, dt_model):
             feature_indices.append(feature_index)
             return f"feature ({feature_index}) [{feature_name}]"
 
-        # Use regular expressions to find and replace feature indices
         tree_string_with_names = re.sub(r"feature (\d+)", replace_match, tree_string)
         return tree_string_with_names, feature_indices
 
@@ -213,23 +212,16 @@ def create_dt_and_feature_df(spark, dt_model):
         tree_string, dt_vocabulary
     )
 
-    # Count occurrences of each feature index
     feature_counts = Counter(feature_indices)
 
-    # Create a list of tuples (feature_name, count)
     feature_usage_data = [
         (dt_vocabulary[idx], count) for idx, count in feature_counts.items()
     ]
 
-    # Initialize SparkSession (if not already initialized)
-    spark = SparkSession.builder.appName("FeatureUsage").getOrCreate()
-
-    # Create a DataFrame from the feature usage data
     feature_usage_df = spark.createDataFrame(
         feature_usage_data, ["feature_name", "count"]
     )
 
-    # Show the DataFrame
     feature_usage_df.orderBy(col("count").desc()).show()
 
     return tree_string_with_names, feature_usage_df
@@ -238,3 +230,4 @@ def create_dt_and_feature_df(spark, dt_model):
 if __name__ == "__main__":
     print("Running Victorian Author analysis...")
     run()
+    print("--\n--\nDone!\n--\n--")
