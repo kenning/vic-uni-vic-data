@@ -95,9 +95,11 @@ def run():
         "is_dt": False,
     }
 
-    # TODO TEMP
-    # lr_logs, _, _ = build_pipeline_and_evaluate(**kwargz)
-    lr_logs = ["lr log 1", "lr log 2"]
+    # Ignore lr in test run
+    if test_run:
+        lr_logs = ["lr log 1", "lr log 2"]
+    else:
+        lr_logs, _, _ = build_pipeline_and_evaluate(**kwargz)
 
     kwargz["is_dt"] = True
     dt_logs, dt_strings, feature_dfs = build_pipeline_and_evaluate(**kwargz)
@@ -121,7 +123,9 @@ def run():
 
         for i, df in enumerate(feature_dfs):
             pandas_df = df.coalesce(1).toPandas()
-            save_pandas_df_to_hdfs(pandas_df, output_path, f"pd_feature_df_{i}.csv")
+            save_pandas_df_to_hdfs(
+                spark, pandas_df, output_path, f"pd_feature_df_{i}.csv"
+            )
 
 
 ############################################################
@@ -150,6 +154,10 @@ def build_pipeline_and_evaluate(
     feature_dfs = []
 
     for i in range(3):
+        # Only run once in test run
+        if test_run and i > 0:
+            continue
+
         curr_pipeline_name = ""
         if i == 0:
             curr_pipeline = Pipeline(
