@@ -94,11 +94,12 @@ def run():
         "is_dt": False,
     }
 
-    # Ignore lr in small sample size run
-    if small_sample_and_dt:
-        lr_logs = ["lr log 1", "lr log 2"]
-    else:
-        lr_logs, _, _ = build_pipeline_and_evaluate(**kwargz)
+    # TODO TEMP DISABLE LR
+    lr_logs = ["lr log 1", "lr log 2"]
+    #if small_sample_and_dt:
+    #    lr_logs = ["lr log 1", "lr log 2"]
+    #else:
+    #    lr_logs, _, _ = build_pipeline_and_evaluate(**kwargz)
 
     kwargz["is_dt"] = True
     dt_logs, dt_strings, feature_dfs = build_pipeline_and_evaluate(**kwargz)
@@ -117,10 +118,11 @@ def run():
 
     if not test_run:
         rdd = sc.parallelize(all_logs, numSlices=1)
-        output_path = f"hdfs://co246a-a.ecs.vuw.ac.nz:9000/user/{username}/vic-output"
-        rdd.saveAsTextFile(output_path)
+        log_output_path = f"hdfs://co246a-a.ecs.vuw.ac.nz:9000/user/{username}/vic-output/logs"
+        rdd.saveAsTextFile(log_output_path)
 
         for i, df in enumerate(feature_dfs):
+            output_path = f"hdfs://co246a-a.ecs.vuw.ac.nz:9000/user/{username}/vic-output/df-{i}"
             save_df_to_hdfs(spark, df, output_path, f"feat_df_{i}.csv")
 
 
@@ -149,10 +151,11 @@ def build_pipeline_and_evaluate(
     decision_tree_strings = []
     feature_dfs = []
 
-    for i in range(3):
+    # TODO TEMP IGNORE TRIGRAMS
+    for i in range(2):
         # Only run once in test run
-        if test_run and i > 0:
-            continue
+        # if small_sample_and_dt and i > 0:
+        #     continue
 
         curr_pipeline_name = ""
         if i == 0:
@@ -248,9 +251,9 @@ def save_df_to_hdfs(spark, df, hdfs_path, filename):
     Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
     FileSystem = sc._gateway.jvm.org.apache.hadoop.fs.FileSystem
     Configuration = sc._gateway.jvm.org.apache.hadoop.conf.Configuration
-    df.coalesce(1).write.option("header", True).option("delimiter", "|").option(
+    df.coalesce(1).write.option("header", True).option("delimiter", ",").option(
         "compression", "none"
-    ).csv(hdfs_path)
+    ).mode("overwrite").csv(hdfs_path)
     fs = FileSystem.get(Configuration())
     file = fs.globStatus(Path("%s/part*" % hdfs_path))[0].getPath().getName()
     full_path = "%s/%s" % (hdfs_path, filename)
