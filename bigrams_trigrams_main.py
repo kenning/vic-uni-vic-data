@@ -94,15 +94,25 @@ def run():
         "is_dt": False,
     }
 
-    lr_logs, _, _ = build_pipeline_and_evaluate(**kwargz)
+    # TODO TEMP DISABLE LR
+    lr_logs = ["lr log 1", "lr log 2"]
+    # if small_sample_and_dt:
+    #    lr_logs = ["lr log 1", "lr log 2"]
+    # else:
+    #    lr_logs, _, _ = build_pipeline_and_evaluate(**kwargz)
+
+    kwargz["is_dt"] = True
+    dt_logs, dt_strings, feature_dfs = build_pipeline_and_evaluate(**kwargz)
 
     ############################################################
     # Print results, optionally to HDFS
     ############################################################
 
     time_log = [f"Full process took {time.time() - start_time} seconds"]
-    all_logs = lr_logs + time_log
+    all_logs = lr_logs + dt_logs + dt_strings + time_log
     print("\n".join(all_logs))
+    for df in feature_dfs:
+        df.show()
 
     print(time_log)
 
@@ -112,6 +122,12 @@ def run():
             f"hdfs://co246a-a.ecs.vuw.ac.nz:9000/user/{username}/vic-output/logs"
         )
         rdd.saveAsTextFile(log_output_path)
+
+        for i, df in enumerate(feature_dfs):
+            output_path = (
+                f"hdfs://co246a-a.ecs.vuw.ac.nz:9000/user/{username}/vic-output/df-{i}"
+            )
+            save_df_to_hdfs(spark, df, output_path, f"feat_df_{i}.csv")
 
 
 ############################################################
@@ -136,24 +152,97 @@ def build_pipeline_and_evaluate(
     classifier = dt if is_dt else lr
     classifier_name = "Decision Tree" if is_dt else "Logistic Regression"
     result_strings = []
+    decision_tree_strings = []
+    feature_dfs = []
 
-    curr_pipeline = Pipeline(
-        stages=[tokenizer, remover, unigram_vectorizer, classifier]
+    # TODO TEMP IGNORE TRIGRAMS
+    for i in range(2):
+        # Only run once in test run
+        # if small_sample_and_dt and i > 0:
+        #     continue
+
+        curr_pipeline_name = ""
+        if i == 0:
+            curr_pipeline = Pipeline(
+                stages=[tokenizer, remover, unigram_vectorizer, classifier]
+            )
+            curr_pipeline_name = "Unigram"
+        elif i == 1:
+            curr_pipeline = Pipeline(
+                stages=[tokenizer, remover, bigram, bigram_vectorizer, classifier]
+            )
+            curr_pipeline_name = "Bigram"
+        elif i == 2:
+            curr_pipeline = Pipeline(
+                stages=[tokenizer, remover, trigram, trigram_vectorizer, classifier]
+            )
+            curr_pipeline_name = "Trigram"
+        else:
+            raise Exception("this should not happen")
+
+        curr_model = curr_pipeline.fit(training_data)
+        curr_predictions = curr_model.transform(test_data)
+
+        curr_evaluator = MulticlassClassificationEvaluator(
+            labelCol="author", predictionCol="prediction", metricName="accuracy"
+        )
+        curr_accuracy = curr_evaluator.evaluate(curr_predictions)
+        result_string = f"[{classifier_name}] Test Accuracy for {curr_pipeline_name}: {curr_accuracy:.5f}"
+        print(result_string)
+        result_strings.append(result_string)
+
+        if is_dt:
+            dt_str, feature_df = create_dt_and_feature_df(
+                spark=spark, dt_model=curr_model
+            )
+            decision_tree_strings.append(dt_str)
+            feature_dfs.append(feature_df)
+
+    return result_strings, decision_tree_strings, feature_dfs
+
+
+############################################################
+# Generate decision tree and ngram dataframe.
+############################################################
+def create_dt_and_feature_df(spark, dt_model):
+    dt_classifier_model = dt_model.stages[-1]
+    dt_vectorizer = dt_model.stages[-2]
+    dt_vocabulary = dt_vectorizer.vocabulary
+    tree_string = dt_classifier_model.toDebugString
+
+    import re
+    from collections import Counter
+    from pyspark.sql import SparkSession
+
+    def replace_and_collect_feature_indices(tree_string, vocabulary):
+        feature_indices = []
+
+        def replace_match(match):
+            feature_index = int(match.group(1))
+            feature_name = vocabulary[feature_index]
+            feature_indices.append(feature_index)
+            return f"feature ({feature_index}) [{feature_name}]"
+
+        tree_string_with_names = re.sub(r"feature (\d+)", replace_match, tree_string)
+        return tree_string_with_names, feature_indices
+
+    tree_string_with_names, feature_indices = replace_and_collect_feature_indices(
+        tree_string, dt_vocabulary
     )
-    curr_pipeline_name = "Unigram"
 
-    curr_model = curr_pipeline.fit(training_data)
-    curr_predictions = curr_model.transform(test_data)
+    feature_counts = Counter(feature_indices)
 
-    curr_evaluator = MulticlassClassificationEvaluator(
-        labelCol="author", predictionCol="prediction", metricName="accuracy"
+    feature_usage_data = [
+        (dt_vocabulary[idx], count) for idx, count in feature_counts.items()
+    ]
+
+    feature_usage_df = spark.createDataFrame(
+        feature_usage_data, ["feature_name", "count"]
     )
-    curr_accuracy = curr_evaluator.evaluate(curr_predictions)
-    result_string = f"[{classifier_name}] Test Accuracy for {curr_pipeline_name}: {curr_accuracy:.5f}"
-    print(result_string)
-    result_strings.append(result_string)
 
-    return result_strings
+    feature_usage_df.orderBy(col("count").desc()).show()
+
+    return tree_string_with_names, feature_usage_df
 
 
 ############################################################
