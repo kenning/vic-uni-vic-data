@@ -111,7 +111,7 @@ def run():
 
         for i, df in enumerate(feature_dfs):
             df_output_path = f"{output_path}/feature_df_{i}"
-            df.write.mode("overwrite").csv(df_output_path, header=True)
+            df.coalesce(1).write.mode("overwrite").csv(df_output_path, header=True)
 
     print("\n\nDone!\n\n")
 
