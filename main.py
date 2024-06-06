@@ -94,7 +94,7 @@ def run():
         "is_dt": False,
     }
 
-    lr_logs, _, _ = build_pipeline_and_evaluate(**kwargz)
+    lr_logs = build_pipeline_and_evaluate(**kwargz)
 
     ############################################################
     # Print results, optionally to HDFS
