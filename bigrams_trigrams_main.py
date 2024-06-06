@@ -14,6 +14,7 @@ RUN_UNIGRAMS = True
 RUN_BIGRAMS = False
 RUN_TRIGRAMS = False
 DT_DEPTH = 30
+PCA_NUM_COMPONENTS = 50  # -1 if we should not use PCA
 
 username = sys.argv[1]
 test_run = False
@@ -158,8 +159,17 @@ def build_pipeline_and_evaluate(
     test_data,
     is_dt,
 ):
-    lr = LogisticRegression(featuresCol="features", labelCol="author")
-    dt = DecisionTreeClassifier(labelCol="author", featuresCol="features", maxDepth=DT_DEPTH)
+    if PCA_NUM_COMPONENTS != -1:
+        pca = PCA(k=PCA_NUM_COMPONENTS, inputCol="features", outputCol="pcaFeatures")
+        features_col = "pcaFeatures"
+    else:
+        pca = None
+        features_col = "features"
+
+    lr = LogisticRegression(featuresCol=features_col, labelCol="author")
+    dt = DecisionTreeClassifier(
+        featuresCol=features_col, labelCol="author", maxDepth=DT_DEPTH
+    )
     classifier = dt if is_dt else lr
     classifier_name = "Decision Tree" if is_dt else "Logistic Regression"
     result_strings = []
@@ -168,28 +178,31 @@ def build_pipeline_and_evaluate(
 
     for i in range(3):
         if i == 0:
-            if RUN_UNIGRAMS == False:
+            if not RUN_UNIGRAMS:
                 continue
-            curr_pipeline = Pipeline(
-                stages=[tokenizer, remover, unigram_vectorizer, classifier]
-            )
+            stages = [tokenizer, remover, unigram_vectorizer]
             curr_pipeline_name = "Unigram"
         elif i == 1:
-            if RUN_BIGRAMS == False:
+            if not RUN_BIGRAMS:
                 continue
-            curr_pipeline = Pipeline(
-                stages=[tokenizer, remover, bigram, bigram_vectorizer, classifier]
-            )
+            stages = [tokenizer, remover, bigram, bigram_vectorizer]
             curr_pipeline_name = "Bigram"
         elif i == 2:
-            if RUN_TRIGRAMS == False:
+            if not RUN_TRIGRAMS:
                 continue
-            curr_pipeline = Pipeline(
-                stages=[tokenizer, remover, trigram, trigram_vectorizer, classifier]
-            )
+            stages = [tokenizer, remover, trigram, trigram_vectorizer]
             curr_pipeline_name = "Trigram"
         else:
             raise Exception("this should not happen")
+
+        # Add PCA stage if applicable
+        if pca is not None:
+            stages.append(pca)
+
+        # Add classifier stage
+        stages.append(classifier)
+
+        curr_pipeline = Pipeline(stages=stages)
 
         curr_model = curr_pipeline.fit(training_data)
         curr_predictions = curr_model.transform(test_data)
