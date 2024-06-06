@@ -6,6 +6,7 @@ from pyspark.ml import Pipeline
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 from pyspark.ml.feature import Tokenizer, StopWordsRemover, CountVectorizer, NGram
 from pyspark.ml.classification import LogisticRegression, DecisionTreeClassifier
+import pandas as pd
 
 
 username = sys.argv[1]
@@ -113,8 +114,8 @@ def run():
         rdd.saveAsTextFile(output_path)
 
         for i, df in enumerate(feature_dfs):
-            df_output_path = f"{output_path}/feature_df_{i}"
-            df.coalesce(1).write.mode("overwrite").csv(df_output_path, header=True)
+            pandas_df = df.coalesce(1).toPandas()
+            save_pandas_df_to_hdfs(pandas_df, output_path, f"feature_df_{i}.csv")
 
 
 ############################################################
@@ -225,6 +226,24 @@ def create_dt_and_feature_df(spark, dt_model):
     feature_usage_df.orderBy(col("count").desc()).show()
 
     return tree_string_with_names, feature_usage_df
+
+
+############################################################
+# Helper function to save csv with predictable filename
+############################################################
+def save_pandas_df_to_hdfs(spark, pandas_df, output_path, filename):
+    # https://stackoverflow.com/questions/69635571/how-to-save-a-pyspark-dataframe-as-a-csv-with-custom-file-name
+    local_path = f"/tmp/{filename}"
+    hdfs_path = f"{output_path}/{filename}"
+
+    pandas_df.to_csv(local_path, index=False)
+
+    fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(
+        spark._jsc.hadoopConfiguration()
+    )
+    fs.copyFromLocalFile(
+        True, True, spark._jvm.Path(local_path), spark._jvm.Path(hdfs_path)
+    )
 
 
 if __name__ == "__main__":
