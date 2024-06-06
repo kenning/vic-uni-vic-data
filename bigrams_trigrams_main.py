@@ -8,11 +8,12 @@ from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 from pyspark.ml.feature import Tokenizer, StopWordsRemover, CountVectorizer, NGram
 from pyspark.ml.classification import LogisticRegression, DecisionTreeClassifier
 
-RUN_LR = True
-RUN_DT = False
-RUN_UNIGRAMS = False
-RUN_BIGRAMS = True
+RUN_LR = False
+RUN_DT = True
+RUN_UNIGRAMS = True
+RUN_BIGRAMS = False
 RUN_TRIGRAMS = False
+DT_DEPTH = 30
 
 username = sys.argv[1]
 test_run = False
@@ -158,7 +159,7 @@ def build_pipeline_and_evaluate(
     is_dt,
 ):
     lr = LogisticRegression(featuresCol="features", labelCol="author")
-    dt = DecisionTreeClassifier(labelCol="author", featuresCol="features")
+    dt = DecisionTreeClassifier(labelCol="author", featuresCol="features", maxDepth=DT_DEPTH)
     classifier = dt if is_dt else lr
     classifier_name = "Decision Tree" if is_dt else "Logistic Regression"
     result_strings = []
