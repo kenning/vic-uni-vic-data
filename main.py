@@ -78,6 +78,7 @@ def run():
     ############################################################
 
     kwargz = {
+        "spark": spark,
         "tokenizer": tokenizer,
         "remover": remover,
         "unigram_vectorizer": unigram_vectorizer,
@@ -121,6 +122,7 @@ def run():
 # Also generates decision tree, as well as ngram dataframe.
 ############################################################
 def build_pipeline_and_evaluate(
+    spark,
     tokenizer,
     remover,
     unigram_vectorizer,
@@ -172,7 +174,9 @@ def build_pipeline_and_evaluate(
         result_strings.append(result_string)
 
         if is_dt:
-            dt_str, feature_df = create_dt_and_feature_df(dt_model=curr_model)
+            dt_str, feature_df = create_dt_and_feature_df(
+                spark=spark, dt_model=curr_model
+            )
             decision_tree_strings.append(dt_str)
             feature_dfs.append(feature_df)
 
@@ -182,7 +186,7 @@ def build_pipeline_and_evaluate(
 ############################################################
 # Generate decision tree and ngram dataframe.
 ############################################################
-def create_dt_and_feature_df(dt_model):
+def create_dt_and_feature_df(spark, dt_model):
     dt_classifier_model = dt_model.stages[-1]
     dt_vectorizer = dt_model.stages[-2]
     dt_vocabulary = dt_vectorizer.vocabulary
