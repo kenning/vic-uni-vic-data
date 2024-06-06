@@ -9,7 +9,7 @@ hadoop fs -test -d /user/$MY_USERNAME/vic-output && hadoop fs -rm -r /user/$MY_U
 
 echo "Running spark-submit"
 #spark-submit --master yarn --deploy-mode cluster main.py $MY_USERNAME 
-spark-submit --master yarn main.py $MY_USERNAME 
+spark-submit --master yarn bigrams_trigrams_main.py $MY_USERNAME 
 
 # Print the output (its saved in hdfs)
 hadoop fs -cat /user/$MY_USERNAME/vic-output/logs/part-00000

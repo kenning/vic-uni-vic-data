@@ -8,6 +8,11 @@ from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 from pyspark.ml.feature import Tokenizer, StopWordsRemover, CountVectorizer, NGram
 from pyspark.ml.classification import LogisticRegression, DecisionTreeClassifier
 
+RUN_LR = True
+RUN_DT = False
+RUN_UNIGRAMS = False
+RUN_BIGRAMS = True
+RUN_TRIGRAMS = False
 
 username = sys.argv[1]
 test_run = False
@@ -94,15 +99,20 @@ def run():
         "is_dt": False,
     }
 
-    # TODO TEMP DISABLE LR
-    lr_logs = ["lr log 1", "lr log 2"]
+    if RUN_LR:
+        lr_logs, _, _ = build_pipeline_and_evaluate(**kwargz)
     # if small_sample_and_dt:
     #    lr_logs = ["lr log 1", "lr log 2"]
-    # else:
-    #    lr_logs, _, _ = build_pipeline_and_evaluate(**kwargz)
+    else:
+        lr_logs = ["test lr log"]
 
-    kwargz["is_dt"] = True
-    dt_logs, dt_strings, feature_dfs = build_pipeline_and_evaluate(**kwargz)
+    if RUN_DT:
+        kwargz["is_dt"] = True
+        dt_logs, dt_strings, feature_dfs = build_pipeline_and_evaluate(**kwargz)
+    else:
+        dt_logs = []
+        dt_strings = []
+        feature_dfs = None
 
     ############################################################
     # Print results, optionally to HDFS
@@ -111,8 +121,9 @@ def run():
     time_log = [f"Full process took {time.time() - start_time} seconds"]
     all_logs = lr_logs + dt_logs + dt_strings + time_log
     print("\n".join(all_logs))
-    for df in feature_dfs:
-        df.show()
+    if feature_dfs is not None:
+        for df in feature_dfs:
+            df.show()
 
     print(time_log)
 
@@ -123,11 +134,10 @@ def run():
         )
         rdd.saveAsTextFile(log_output_path)
 
-        for i, df in enumerate(feature_dfs):
-            output_path = (
-                f"hdfs://co246a-a.ecs.vuw.ac.nz:9000/user/{username}/vic-output/df-{i}"
-            )
-            save_df_to_hdfs(spark, df, output_path, f"feat_df_{i}.csv")
+        if feature_dfs is not None:
+            for i, df in enumerate(feature_dfs):
+                output_path = f"hdfs://co246a-a.ecs.vuw.ac.nz:9000/user/{username}/vic-output/df-{i}"
+                save_df_to_hdfs(spark, df, output_path, f"feat_df_{i}.csv")
 
 
 ############################################################
@@ -155,12 +165,7 @@ def build_pipeline_and_evaluate(
     decision_tree_strings = []
     feature_dfs = []
 
-    # TODO TEMP IGNORE TRIGRAMS
     for i in range(2):
-        # Only run once in test run
-        # if small_sample_and_dt and i > 0:
-        #     continue
-
         curr_pipeline_name = ""
         if i == 0:
             curr_pipeline = Pipeline(
