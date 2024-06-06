@@ -9,17 +9,20 @@ from pyspark.ml.classification import LogisticRegression, DecisionTreeClassifier
 
 
 username = sys.argv[1]
-print(username)
+test_run = False
+if username == "test":
+    test_run = True
+    print("Test run")
+else:
+    print(f"Running as user {username}")
 
 small_sample_size = False
+sample_fraction = 0.0001
 if len(sys.argv) > 2:
     if sys.argv[2] == "--sample":
         small_sample_size = True
-print(small_sample_size)
 
-
-def test(a, b, c):
-    print(f"{a=} {b=} {c=}")
+        print(f"Only running on sample of {sample_fraction*100:02}% of data")
 
 
 def run():
@@ -49,9 +52,6 @@ def run():
 
     (training_data, test_data) = sample.randomSplit([0.8, 0.2], seed=100)
 
-    # print(sample.printSchema())
-    # sample.show(5)
-
     ############################################################
     # Pipeline component initialization
     ############################################################
@@ -73,7 +73,10 @@ def run():
     bigram_vectorizer = CountVectorizer(inputCol="bigrams", outputCol="features")
     trigram_vectorizer = CountVectorizer(inputCol="trigrams", outputCol="features")
 
-    # num_iterations = 10
+    ############################################################
+    # Run DT and LR models
+    ############################################################
+
     kwargz = {
         "tokenizer": tokenizer,
         "remover": remover,
@@ -87,18 +90,36 @@ def run():
         "is_dt": False,
     }
 
-    lr_logs = build_pipeline_and_evaluate(**kwargz)
+    # TODO TEMP
+    # lr_logs, _, _ = build_pipeline_and_evaluate(**kwargz)
+    lr_logs = ["lr log 1", "lr log 2"]
 
     kwargz["is_dt"] = True
-    dt_logs = build_pipeline_and_evaluate(**kwargz)
+    dt_logs, dt_strings, feature_dfs = build_pipeline_and_evaluate(**kwargz)
 
-    print("\n".join(lr_logs + dt_logs))
+    ############################################################
+    # Print results, optionally to HDFS
+    ############################################################
 
-    rdd = sc.parallelize(lr_logs + dt_logs, numSlices=1)
-    output_path = f"hdfs://co246a-a.ecs.vuw.ac.nz:9000/user/{username}/vic-output"
-    rdd.saveAsTextFile(output_path)
+    all_logs = lr_logs + dt_logs + dt_strings
+    print("\n".join(all_logs))
+
+    if not test_run:
+        rdd = sc.parallelize(lr_logs + dt_logs, numSlices=1)
+        output_path = f"hdfs://co246a-a.ecs.vuw.ac.nz:9000/user/{username}/vic-output"
+        rdd.saveAsTextFile(output_path)
+
+        for i, df in enumerate(feature_dfs):
+            df_output_path = f"{output_path}/feature_df_{i}"
+            df.write.mode("overwrite").csv(df_output_path, header=True)
+
+    print("\n\nDone!\n\n")
 
 
+############################################################
+# Builds either LR or DT pipeline and evaluates data.
+# Also generates decision tree, as well as ngram dataframe.
+############################################################
 def build_pipeline_and_evaluate(
     tokenizer,
     remover,
@@ -111,12 +132,14 @@ def build_pipeline_and_evaluate(
     test_data,
     is_dt,
 ):
-
     lr = LogisticRegression(featuresCol="features", labelCol="author")
     dt = DecisionTreeClassifier(labelCol="author", featuresCol="features")
     classifier = dt if is_dt else lr
     classifier_name = "Decision Tree" if is_dt else "Logistic Regression"
     result_strings = []
+    decision_tree_strings = []
+    feature_dfs = []
+
     for i in range(3):
         curr_pipeline_name = ""
         if i == 0:
@@ -148,7 +171,64 @@ def build_pipeline_and_evaluate(
         print(result_string)
         result_strings.append(result_string)
 
-    return result_strings
+        if is_dt:
+            dt_str, feature_df = create_dt_and_feature_df(dt_model=curr_model)
+            decision_tree_strings.append(dt_str)
+            feature_dfs.append(feature_df)
+
+    return result_strings, decision_tree_strings, feature_dfs
+
+
+############################################################
+# Generate decision tree and ngram dataframe.
+############################################################
+def create_dt_and_feature_df(dt_model):
+    dt_classifier_model = dt_model.stages[-1]
+    dt_vectorizer = dt_model.stages[-2]
+    dt_vocabulary = dt_vectorizer.vocabulary
+    tree_string = dt_classifier_model.toDebugString
+
+    import re
+    from collections import Counter
+    from pyspark.sql import SparkSession
+
+    def replace_and_collect_feature_indices(tree_string, vocabulary):
+        feature_indices = []
+
+        def replace_match(match):
+            feature_index = int(match.group(1))
+            feature_name = vocabulary[feature_index]
+            feature_indices.append(feature_index)
+            return f"feature ({feature_index}) [{feature_name}]"
+
+        # Use regular expressions to find and replace feature indices
+        tree_string_with_names = re.sub(r"feature (\d+)", replace_match, tree_string)
+        return tree_string_with_names, feature_indices
+
+    tree_string_with_names, feature_indices = replace_and_collect_feature_indices(
+        tree_string, dt_vocabulary
+    )
+
+    # Count occurrences of each feature index
+    feature_counts = Counter(feature_indices)
+
+    # Create a list of tuples (feature_name, count)
+    feature_usage_data = [
+        (dt_vocabulary[idx], count) for idx, count in feature_counts.items()
+    ]
+
+    # Initialize SparkSession (if not already initialized)
+    spark = SparkSession.builder.appName("FeatureUsage").getOrCreate()
+
+    # Create a DataFrame from the feature usage data
+    feature_usage_df = spark.createDataFrame(
+        feature_usage_data, ["feature_name", "count"]
+    )
+
+    # Show the DataFrame
+    feature_usage_df.orderBy(col("count").desc()).show()
+
+    return tree_string_with_names, feature_usage_df
 
 
 if __name__ == "__main__":
