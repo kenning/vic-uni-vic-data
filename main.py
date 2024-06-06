@@ -17,11 +17,11 @@ if username == "test":
 else:
     print(f"Running as user {username}")
 
-small_sample_size = False
+small_sample_and_dt = False
 sample_fraction = 0.0001
 if len(sys.argv) > 2:
     if sys.argv[2] == "--sample":
-        small_sample_size = True
+        small_sample_and_dt = True
 
         print(f"Only running on sample of {sample_fraction*100:02}% of data")
 
@@ -48,7 +48,7 @@ def run():
     data = data.withColumn("author", col("author").cast(IntegerType()))
 
     # For local testing: take a small subset of data
-    if small_sample_size:
+    if small_sample_and_dt:
         sample = data.sample(withReplacement=False, fraction=sample_fraction, seed=100)
     else:
         sample = data
@@ -94,8 +94,8 @@ def run():
         "is_dt": False,
     }
 
-    # Ignore lr in test run
-    if test_run:
+    # Ignore lr in small sample size run
+    if small_sample_and_dt:
         lr_logs = ["lr log 1", "lr log 2"]
     else:
         lr_logs, _, _ = build_pipeline_and_evaluate(**kwargz)
