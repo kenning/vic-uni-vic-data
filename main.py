@@ -1,4 +1,5 @@
 import sys
+import time
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col
 from pyspark.sql.types import IntegerType
@@ -27,6 +28,8 @@ if len(sys.argv) > 2:
 
 
 def run():
+    start_time = time.time()
+
     spark = SparkSession.builder.appName("AuthorPrediction").getOrCreate()
     sc = spark.sparkContext
 
@@ -103,7 +106,8 @@ def run():
     # Print results, optionally to HDFS
     ############################################################
 
-    all_logs = lr_logs + dt_logs + dt_strings
+    time_log = [f"Full process took {time.time() - start_time} seconds"]
+    all_logs = lr_logs + dt_logs + dt_strings + time_log
     print("\n".join(all_logs))
     for df in feature_dfs:
         df.show()
@@ -115,7 +119,7 @@ def run():
 
         for i, df in enumerate(feature_dfs):
             pandas_df = df.coalesce(1).toPandas()
-            save_pandas_df_to_hdfs(pandas_df, output_path, f"feature_df_{i}.csv")
+            save_pandas_df_to_hdfs(pandas_df, output_path, f"pd_feature_df_{i}.csv")
 
 
 ############################################################
