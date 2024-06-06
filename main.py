@@ -96,9 +96,9 @@ def run():
 
     # TODO TEMP DISABLE LR
     lr_logs = ["lr log 1", "lr log 2"]
-    #if small_sample_and_dt:
+    # if small_sample_and_dt:
     #    lr_logs = ["lr log 1", "lr log 2"]
-    #else:
+    # else:
     #    lr_logs, _, _ = build_pipeline_and_evaluate(**kwargz)
 
     kwargz["is_dt"] = True
@@ -118,11 +118,15 @@ def run():
 
     if not test_run:
         rdd = sc.parallelize(all_logs, numSlices=1)
-        log_output_path = f"hdfs://co246a-a.ecs.vuw.ac.nz:9000/user/{username}/vic-output/logs"
+        log_output_path = (
+            f"hdfs://co246a-a.ecs.vuw.ac.nz:9000/user/{username}/vic-output/logs"
+        )
         rdd.saveAsTextFile(log_output_path)
 
         for i, df in enumerate(feature_dfs):
-            output_path = f"hdfs://co246a-a.ecs.vuw.ac.nz:9000/user/{username}/vic-output/df-{i}"
+            output_path = (
+                f"hdfs://co246a-a.ecs.vuw.ac.nz:9000/user/{username}/vic-output/df-{i}"
+            )
             save_df_to_hdfs(spark, df, output_path, f"feat_df_{i}.csv")
 
 
