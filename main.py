@@ -7,7 +7,6 @@ from pyspark.ml import Pipeline
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 from pyspark.ml.feature import Tokenizer, StopWordsRemover, CountVectorizer, NGram
 from pyspark.ml.classification import LogisticRegression, DecisionTreeClassifier
-import pandas as pd
 
 
 username = sys.argv[1]
@@ -122,10 +121,7 @@ def run():
         rdd.saveAsTextFile(output_path)
 
         for i, df in enumerate(feature_dfs):
-            pandas_df = df.coalesce(1).toPandas()
-            save_pandas_df_to_hdfs(
-                spark, pandas_df, output_path, f"pd_feature_df_{i}.csv"
-            )
+            save_df_to_hdfs(spark, df, output_path, f"feat_df_{i}.csv")
 
 
 ############################################################
@@ -245,19 +241,21 @@ def create_dt_and_feature_df(spark, dt_model):
 ############################################################
 # Helper function to save csv with predictable filename
 ############################################################
-def save_pandas_df_to_hdfs(spark, pandas_df, output_path, filename):
+def save_df_to_hdfs(spark, df, hdfs_path, filename):
     # https://stackoverflow.com/questions/69635571/how-to-save-a-pyspark-dataframe-as-a-csv-with-custom-file-name
-    local_path = f"/tmp/{filename}"
-    hdfs_path = f"{output_path}/{filename}"
 
-    pandas_df.to_csv(local_path, index=False)
-
-    fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(
-        spark._jsc.hadoopConfiguration()
-    )
-    fs.copyFromLocalFile(
-        True, True, spark._jvm.Path(local_path), spark._jvm.Path(hdfs_path)
-    )
+    sc = spark.sparkContext
+    Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
+    FileSystem = sc._gateway.jvm.org.apache.hadoop.fs.FileSystem
+    Configuration = sc._gateway.jvm.org.apache.hadoop.conf.Configuration
+    df.coalesce(1).write.option("header", True).option("delimiter", "|").option(
+        "compression", "none"
+    ).csv(hdfs_path)
+    fs = FileSystem.get(Configuration())
+    file = fs.globStatus(Path("%s/part*" % hdfs_path))[0].getPath().getName()
+    full_path = "%s/%s" % (hdfs_path, filename)
+    result = fs.rename(Path("%s/%s" % (hdfs_path, file)), Path(full_path))
+    return result
 
 
 if __name__ == "__main__":
