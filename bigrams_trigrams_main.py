@@ -11,10 +11,10 @@ from pyspark.ml.classification import LogisticRegression, DecisionTreeClassifier
 RUN_LR = False
 RUN_DT = True
 RUN_UNIGRAMS = True
-RUN_BIGRAMS = False
-RUN_TRIGRAMS = False
+RUN_BIGRAMS = True
+RUN_TRIGRAMS = True
 DT_DEPTH = 30
-PCA_NUM_COMPONENTS = 50  # -1 if we should not use PCA
+PCA_NUM_COMPONENTS = 30  # -1 if we should not use PCA
 
 username = sys.argv[1]
 test_run = False
@@ -121,7 +121,7 @@ def run():
     ############################################################
 
     time_log = [f"Full process took {time.time() - start_time} seconds"]
-    all_logs = lr_logs + dt_logs + dt_strings + time_log
+    all_logs = dt_strings + lr_logs + dt_logs + time_log
     print("\n".join(all_logs))
     if feature_dfs is not None:
         for df in feature_dfs:
