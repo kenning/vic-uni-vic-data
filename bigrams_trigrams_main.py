@@ -165,19 +165,24 @@ def build_pipeline_and_evaluate(
     decision_tree_strings = []
     feature_dfs = []
 
-    for i in range(2):
-        curr_pipeline_name = ""
+    for i in range(3):
         if i == 0:
+            if RUN_UNIGRAMS == False:
+                continue
             curr_pipeline = Pipeline(
                 stages=[tokenizer, remover, unigram_vectorizer, classifier]
             )
             curr_pipeline_name = "Unigram"
         elif i == 1:
+            if RUN_BIGRAMS == False:
+                continue
             curr_pipeline = Pipeline(
                 stages=[tokenizer, remover, bigram, bigram_vectorizer, classifier]
             )
             curr_pipeline_name = "Bigram"
         elif i == 2:
+            if RUN_TRIGRAMS == False:
+                continue
             curr_pipeline = Pipeline(
                 stages=[tokenizer, remover, trigram, trigram_vectorizer, classifier]
             )
