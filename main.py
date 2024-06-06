@@ -112,8 +112,10 @@ def run():
     for df in feature_dfs:
         df.show()
 
+    print(time_log)
+
     if not test_run:
-        rdd = sc.parallelize(lr_logs + dt_logs, numSlices=1)
+        rdd = sc.parallelize(all_logs, numSlices=1)
         output_path = f"hdfs://co246a-a.ecs.vuw.ac.nz:9000/user/{username}/vic-output"
         rdd.saveAsTextFile(output_path)
 
