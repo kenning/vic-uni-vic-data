@@ -38,7 +38,7 @@ def run():
         .option("encoding", "latin1")
         .option("inferSchema", "true")
         .csv(
-            "data/dataset/Gungor_2018_VictorianAuthorAttribution_data.csv",
+            "./Gungor_2018_VictorianAuthorAttribution_data.csv",
         )
     )
 
@@ -46,7 +46,7 @@ def run():
 
     # For local testing: take a small subset of data
     if small_sample_size:
-        sample = data.sample(withReplacement=False, fraction=0.002, seed=100)
+        sample = data.sample(withReplacement=False, fraction=sample_fraction, seed=100)
     else:
         sample = data
 
