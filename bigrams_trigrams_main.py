@@ -10,8 +10,8 @@ from pyspark.ml.classification import LogisticRegression, DecisionTreeClassifier
 from pyspark.ml.feature import PCA
 
 
-RUN_LR = False
-RUN_DT = True
+RUN_LR = True
+RUN_DT = False
 RUN_UNIGRAMS = True
 RUN_BIGRAMS = True
 RUN_TRIGRAMS = True
@@ -207,22 +207,24 @@ def build_pipeline_and_evaluate(
         curr_pipeline = Pipeline(stages=stages)
 
         curr_model = curr_pipeline.fit(training_data)
-        curr_predictions = curr_model.transform(test_data)
+        for testing_set in [test_data, training_data]:
+            test_set_name = "Test" if testing_set == test_data else "Train"
+            curr_predictions = curr_model.transform(testing_set)
 
-        curr_evaluator = MulticlassClassificationEvaluator(
-            labelCol="author", predictionCol="prediction", metricName="accuracy"
-        )
-        curr_accuracy = curr_evaluator.evaluate(curr_predictions)
-        result_string = f"[{classifier_name}] Test Accuracy for {curr_pipeline_name}: {curr_accuracy:.5f}"
-        print(result_string)
-        result_strings.append(result_string)
-
-        if is_dt and pca is None:
-            dt_str, feature_df = create_dt_and_feature_df(
-                spark=spark, dt_model=curr_model
+            curr_evaluator = MulticlassClassificationEvaluator(
+                labelCol="author", predictionCol="prediction", metricName="accuracy"
             )
-            decision_tree_strings.append(dt_str)
-            feature_dfs.append(feature_df)
+            curr_accuracy = curr_evaluator.evaluate(curr_predictions)
+            result_string = f"[{classifier_name} {test_set_name}] Accuracy for {curr_pipeline_name}: {curr_accuracy:.5f}"
+            print(result_string)
+            result_strings.append(result_string)
+
+            if is_dt and pca is None:
+                dt_str, feature_df = create_dt_and_feature_df(
+                    spark=spark, dt_model=curr_model
+                )
+                decision_tree_strings.append(dt_str)
+                feature_dfs.append(feature_df)
 
     return result_strings, decision_tree_strings, feature_dfs
 
