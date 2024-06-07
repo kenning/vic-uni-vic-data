@@ -4,6 +4,23 @@ MY_USERNAME=$(whoami)
 hadoop fs -mkdir -p /user/$MY_USERNAME
 hadoop fs -put Gungor_2018_VictorianAuthorAttribution_data.csv /user/$MY_USERNAME/Gungor_2018_VictorianAuthorAttribution_data.csv
 
+# NOTE: UNCOMMENT IF DOING PCA_MAIN.PY
+# list=( 
+#   "victorian_author_attribution_pca_2.csv"
+#   "victorian_author_attribution_pca_20.csv"
+#   "victorian_author_attribution_pca_200.csv"
+#   "2gram_victorian_author_attribution_pca_2.csv"
+#   "3gram_victorian_author_attribution_pca_2.csv"
+#   "2gram_victorian_author_attribution_pca_10.csv"
+#   "1gram_victorian_author_attribution_pca_10.csv"
+# )
+# for item in "${list[@]}"
+# do
+#     hadoop fs -put "$item" "/user/$MY_USERNAME/$item"
+# done
+
+
+
 # Remove output dir if exists
 hadoop fs -test -d /user/$MY_USERNAME/vic-output && hadoop fs -rm -r /user/$MY_USERNAME/vic-output
 
