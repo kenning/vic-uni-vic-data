@@ -1,5 +1,5 @@
 data/dataset/
-Gungor_2018_VictorianAuthorAttribution_data.csv
+*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
