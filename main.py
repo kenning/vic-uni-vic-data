@@ -8,6 +8,7 @@ from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 from pyspark.ml.feature import Tokenizer, StopWordsRemover, CountVectorizer, NGram
 from pyspark.ml.classification import LogisticRegression, DecisionTreeClassifier
 
+SEED=102
 
 username = sys.argv[1]
 test_run = False
@@ -49,11 +50,11 @@ def run():
 
     # For local testing: take a small subset of data
     if small_sample_and_dt:
-        sample = data.sample(withReplacement=False, fraction=sample_fraction, seed=100)
+        sample = data.sample(withReplacement=False, fraction=sample_fraction, seed=SEED)
     else:
         sample = data
 
-    (training_data, test_data) = sample.randomSplit([0.8, 0.2], seed=100)
+    (training_data, test_data) = sample.randomSplit([0.8, 0.2], seed=SEED)
 
     ############################################################
     # Pipeline component initialization
