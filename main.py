@@ -5,10 +5,17 @@ from pyspark.sql.functions import col
 from pyspark.sql.types import IntegerType
 from pyspark.ml import Pipeline
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
-from pyspark.ml.feature import Tokenizer, StopWordsRemover, CountVectorizer, NGram
+from pyspark.ml.feature import (
+    Tokenizer,
+    StopWordsRemover,
+    CountVectorizer,
+    NGram,
+    Normalizer,
+)
 from pyspark.ml.classification import LogisticRegression, DecisionTreeClassifier
 
-SEED=102
+SEED = 100
+USE_L2_NORM = True
 
 username = sys.argv[1]
 test_run = False
@@ -132,15 +139,22 @@ def build_pipeline_and_evaluate(
     test_data,
     is_dt,
 ):
-    lr = LogisticRegression(featuresCol="features", labelCol="author")
-    dt = DecisionTreeClassifier(labelCol="author", featuresCol="features")
-    classifier = dt if is_dt else lr
-    classifier_name = "Decision Tree" if is_dt else "Logistic Regression"
     result_strings = []
+    classifier_name = "Logistic Regression"
 
-    curr_pipeline = Pipeline(
-        stages=[tokenizer, remover, unigram_vectorizer, classifier]
-    )
+    stages = [tokenizer, remover, unigram_vectorizer]
+    features_col_name = "features"
+    if USE_L2_NORM:
+        features_col_name = "norm_features"
+        # p=2.0 == L2 norm
+        normalizer = Normalizer(inputCol="features", outputCol=features_col_name, p=2.0)
+        stages.append(normalizer)
+
+    lr = LogisticRegression(featuresCol=features_col_name, labelCol="author")
+    dt = DecisionTreeClassifier(featuresCol=features_col_name, labelCol="author")
+    classifier = dt if is_dt else lr
+    stages.append(classifier)
+    curr_pipeline = Pipeline(stages=stages)
     curr_pipeline_name = "Unigram"
 
     curr_model = curr_pipeline.fit(training_data)

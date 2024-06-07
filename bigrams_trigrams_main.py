@@ -7,6 +7,8 @@ from pyspark.ml import Pipeline
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 from pyspark.ml.feature import Tokenizer, StopWordsRemover, CountVectorizer, NGram
 from pyspark.ml.classification import LogisticRegression, DecisionTreeClassifier
+from pyspark.ml.feature import PCA
+
 
 RUN_LR = False
 RUN_DT = True
@@ -215,7 +217,7 @@ def build_pipeline_and_evaluate(
         print(result_string)
         result_strings.append(result_string)
 
-        if is_dt:
+        if is_dt and pca is None:
             dt_str, feature_df = create_dt_and_feature_df(
                 spark=spark, dt_model=curr_model
             )
